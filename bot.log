@@ -1,0 +1,32 @@
+2025-05-05 20:32:54 - root - INFO - Конфигурация успешно загружена
+2025-05-05 20:32:54 - root - CRITICAL - Не удалось запустить бота: 'GigaChatBot' object has no attribute 'run'
+2025-05-05 20:33:32 - root - INFO - Конфигурация успешно загружена
+2025-05-05 20:33:32 - root - CRITICAL - Не удалось запустить бота: 'GigaChatBot' object has no attribute 'run'
+2025-05-05 20:36:47 - root - INFO - Конфигурация успешно загружена
+2025-05-05 20:36:47 - root - INFO - Бот инициализирован
+2025-05-05 20:36:48 - root - INFO - Бот запускается...
+2025-05-05 20:36:48 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getMe "HTTP/1.1 200 OK"
+2025-05-05 20:36:48 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/deleteWebhook "HTTP/1.1 200 OK"
+2025-05-05 20:36:48 - telegram.ext.Application - INFO - Application started
+2025-05-05 20:36:59 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:08 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:19 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:29 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:30 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:30 - root - INFO - Инициализирована сессия GigaChat для пользователя 388494398
+2025-05-05 20:37:30 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/sendMessage "HTTP/1.1 200 OK"
+2025-05-05 20:37:30 - root - INFO - Пользователь 388494398 начал сессию
+2025-05-05 20:37:33 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:34 - httpx - INFO - HTTP Request: POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth "HTTP/1.1 200 OK"
+2025-05-05 20:37:34 - httpx - INFO - HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-05 20:37:35 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/sendMessage "HTTP/1.1 200 OK"
+2025-05-05 20:37:35 - root - INFO - Успешно обработан запрос от пользователя 388494398
+2025-05-05 20:37:39 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:39 - httpx - INFO - HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-05 20:37:39 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/sendMessage "HTTP/1.1 200 OK"
+2025-05-05 20:37:39 - root - INFO - Успешно обработан запрос от пользователя 388494398
+2025-05-05 20:37:49 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:56 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7825677864:AAFaOjiOOThSUItfKnC_E15obeQyhliH7q8/getUpdates "HTTP/1.1 200 OK"
+2025-05-05 20:37:56 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2025-05-05 20:37:56 - telegram.ext.Application - INFO - Application.stop() complete
+2025-05-05 20:37:56 - root - INFO - Бот успешно запущен
