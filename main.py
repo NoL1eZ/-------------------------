@@ -25,13 +25,13 @@ def load_config():
 config = load_config()
 
 # Состояния для ConversationHandler
-SELECTING_MODEL, CHATTING = range(2)
+CHATTING = 1
 
 # Доступные модели GigaChat
 MODELS = {
-    "GigaChat": "GigaChat",
-    "GigaChat-Pro": "GigaChat-Pro",
-    "GigaChat-Plus": "GigaChat-Plus",
+    "GigaChat": "GigaChat (активная)",
+    "GigaChat-Pro": "GigaChat-Pro (не доступен)",
+    "GigaChat-Plus": "GigaChat-Plus (не доступен)",
 }
 
 # Хранение сессий пользователей
@@ -39,11 +39,11 @@ user_sessions = {}
 
 
 # Инициализация GigaChat
-def init_gigachat(model_name, user_id):
+def init_gigachat(user_id):
     credentials = config["GIGACHAT_AUTH_KEY"]
     user_sessions[user_id] = GigaChat(
         credentials=credentials,
-        model=model_name,
+        model="GigaChat",  # Всегда используем базовую модель
         verify_ssl_certs=False
     )
 
@@ -59,37 +59,32 @@ def model_keyboard():
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Привет! Я бот с интеграцией GigaChat. Выбери модель:",
-        reply_markup=model_keyboard()
-    )
-    return SELECTING_MODEL
-
-
-# Обработчик выбора модели
-async def select_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
-    model_name = update.message.text
-
-    if model_name not in MODELS.values():
-        await update.message.reply_text(
-            "Пожалуйста, выбери модель из предложенных вариантов:",
-            reply_markup=model_keyboard()
-        )
-        return SELECTING_MODEL
-
     try:
-        init_gigachat(model_name, user_id)
+        init_gigachat(user_id)
         await update.message.reply_text(
-            f"Модель {model_name} выбрана. Теперь ты можешь отправлять текстовые запросы.",
-            reply_markup=None  # Убираем клавиатуру
+            "Демонстрационная версия бота с моделью GigaChat.\n"
+            "Другие модели недоступны в демонстрационной версии.\n\n"
+            "Можешь отправлять свои запросы:",
+            reply_markup=model_keyboard()
         )
         return CHATTING
     except Exception as e:
         await update.message.reply_text(
-            f"Ошибка при инициализации GigaChat: {str(e)}"
+            f"Ошибка при инициализации GigaChat: {str(e)}\nПопробуйте позже."
         )
-        return SELECTING_MODEL
+        return ConversationHandler.END
+
+
+# Обработчик выбора модели (для недоступных моделей)
+async def handle_model_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected_model = update.message.text
+    if "(не доступен)" in selected_model:
+        await update.message.reply_text(
+            "Эта модель недоступна в демонстрационной версии. Продолжаем использовать GigaChat.",
+            reply_markup=model_keyboard()
+        )
+    return CHATTING
 
 
 # Обработчик текстовых сообщений
@@ -98,21 +93,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id not in user_sessions:
         await update.message.reply_text(
-            "Сначала выбери модель GigaChat из меню.",
-            reply_markup=model_keyboard()
+            "Сессия не инициализирована. Нажмите /start чтобы начать.",
+            reply_markup=None
         )
-        return SELECTING_MODEL
+        return ConversationHandler.END
 
     try:
         response = user_sessions[user_id].chat(update.message.text)
-        await update.message.reply_text(response.choices[0].message.content)
+        await update.message.reply_text(
+            response.choices[0].message.content,
+            reply_markup=model_keyboard()
+        )
         return CHATTING
     except Exception as e:
         await update.message.reply_text(
-            f"Ошибка при обработке запроса: {str(e)}\nПопробуй выбрать модель снова.",
-            reply_markup=model_keyboard()
+            f"Ошибка при обработке запроса: {str(e)}\nНажмите /start чтобы перезапустить бота.",
+            reply_markup=None
         )
-        return SELECTING_MODEL
+        return ConversationHandler.END
 
 
 # Обработчик команды /cancel
@@ -133,11 +131,9 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            SELECTING_MODEL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, select_model)
-            ],
             CHATTING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message),
+                MessageHandler(filters.Regex(r"\(не доступен\)$"), handle_model_selection)
             ],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
