@@ -1,4 +1,16 @@
+"""
+Telegram бот с интеграцией GigaChat API для обработки юридических запросов.
+
+Основные функции:
+- Инициализация сессии с GigaChat
+- Обработка текстовых запросов пользователя
+- Управление сессиями
+- Обратная связь о статусе недоступных функций
+"""
+
 import os
+import logging
+from typing import Dict, Any
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     Application,
@@ -9,141 +21,253 @@ from telegram.ext import (
     ConversationHandler,
 )
 from gigachat import GigaChat
+from gigachat.exceptions import GigaChatException
 
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-# Загрузка конфигурации
-def load_config():
-    config = {}
-    with open("config.txt", "r") as file:
-        for line in file:
-            if "=" in line:
-                key, value = line.strip().split("=", 1)
-                config[key] = value
-    return config
-
-
-config = load_config()
-
-# Состояния для ConversationHandler
+# Константы
 CHATTING = 1
-
-# Доступные модели GigaChat
+CONFIG_FILE = "config.txt"
 MODELS = {
     "GigaChat": "GigaChat (активная)",
     "GigaChat-Pro": "GigaChat-Pro (не доступен)",
     "GigaChat-Plus": "GigaChat-Plus (не доступен)",
 }
 
-# Хранение сессий пользователей
-user_sessions = {}
+class GigaChatBot:
+    """Основной класс бота, инкапсулирующий логику работы."""
+    
+    def __init__(self):
+        self.config = self._load_config()
+        self.user_sessions: Dict[int, GigaChat] = {}
 
+    def _load_config(self) -> Dict[str, str]:
+        """Загружает конфигурацию из файла.
+        
+        Returns:
+            Dict[str, str]: Словарь с параметрами конфигурации
+            
+        Raises:
+            FileNotFoundError: Если файл конфигурации не найден
+            ValueError: Если файл содержит некорректные данные
+        """
+        config = {}
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as file:
+                for line in file:
+                    if "=" in line:
+                        key, value = line.strip().split("=", 1)
+                        config[key] = value
+            if not all(k in config for k in ["TELEGRAM_BOT_TOKEN", "GIGACHAT_AUTH_KEY"]):
+                raise ValueError("Не хватает обязательных параметров в конфигурации")
+            return config
+        except FileNotFoundError as e:
+            logger.error("Файл конфигурации не найден: %s", e)
+            raise
+        except Exception as e:
+            logger.error("Ошибка загрузки конфигурации: %s", e)
+            raise ValueError("Ошибка загрузки конфигурации") from e
 
-# Инициализация GigaChat
-def init_gigachat(user_id):
-    credentials = config["GIGACHAT_AUTH_KEY"]
-    user_sessions[user_id] = GigaChat(
-        credentials=credentials,
-        model="GigaChat",  # Всегда используем базовую модель
-        verify_ssl_certs=False
-    )
+    def _init_gigachat(self, user_id: int) -> None:
+        """Инициализирует сессию GigaChat для пользователя.
+        
+        Args:
+            user_id: Идентификатор пользователя Telegram
+            
+        Raises:
+            GigaChatException: При ошибках инициализации GigaChat
+        """
+        try:
+            self.user_sessions[user_id] = GigaChat(
+                credentials=self.config["GIGACHAT_AUTH_KEY"],
+                model="GigaChat",
+                verify_ssl_certs=False
+            )
+            logger.info("Инициализирована сессия GigaChat для пользователя %s", user_id)
+        except GigaChatException as e:
+            logger.error("Ошибка инициализации GigaChat: %s", e)
+            raise
 
-
-# Клавиатура выбора модели
-def model_keyboard():
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton(model)] for model in MODELS.values()],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-
-
-# Обработчик команды /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    try:
-        init_gigachat(user_id)
-        await update.message.reply_text(
-            "Демонстрационная версия бота с моделью GigaChat.\n"
-            "Другие модели недоступны в демонстрационной версии.\n\n"
-            "Можешь отправлять свои запросы:",
-            reply_markup=model_keyboard()
+    @staticmethod
+    def _model_keyboard() -> ReplyKeyboardMarkup:
+        """Создает клавиатуру с доступными моделями.
+        
+        Returns:
+            ReplyKeyboardMarkup: Объект клавиатуры Telegram
+        """
+        return ReplyKeyboardMarkup(
+            [[KeyboardButton(model)] for model in MODELS.values()],
+            resize_keyboard=True,
+            one_time_keyboard=False
         )
+
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Обработчик команды /start.
+        
+        Args:
+            update: Объект Update от Telegram
+            context: Контекст выполнения
+            
+        Returns:
+            int: Следующее состояние ConversationHandler
+        """
+        user_id = update.message.from_user.id
+        try:
+            self._init_gigachat(user_id)
+            await update.message.reply_text(
+                "Демонстрационная версия бота с моделью GigaChat.\n"
+                "Другие модели недоступны в демонстрационной версии.\n\n"
+                "Можете отправлять свои запросы:",
+                reply_markup=self._model_keyboard()
+            )
+            return CHATTING
+        except Exception as e:
+            await update.message.reply_text(
+                f"Ошибка при инициализации: {str(e)}\nПопробуйте позже."
+            )
+            logger.exception("Ошибка в обработчике start")
+            return ConversationHandler.END
+
+    async def handle_model_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Обрабатывает выбор недоступных моделей.
+        
+        Args:
+            update: Объект Update от Telegram
+            context: Контекст выполнения
+            
+        Returns:
+            int: Следующее состояние ConversationHandler
+        """
+        selected_model = update.message.text
+        if "(не доступен)" in selected_model:
+            await update.message.reply_text(
+                "Эта модель недоступна в демонстрационной версии. Продолжаем использовать GigaChat.",
+                reply_markup=self._model_keyboard()
+            )
+            logger.info("Пользователь %s попытался выбрать недоступную модель %s", 
+                       update.message.from_user.id, selected_model)
         return CHATTING
-    except Exception as e:
+
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Обрабатывает текстовые сообщения пользователя.
+        
+        Args:
+            update: Объект Update от Telegram
+            context: Контекст выполнения
+            
+        Returns:
+            int: Следующее состояние ConversationHandler
+        """
+        user_id = update.message.from_user.id
+
+        if user_id not in self.user_sessions:
+            await update.message.reply_text(
+                "Сессия не инициализирована. Нажмите /start чтобы начать.",
+                reply_markup=None
+            )
+            return ConversationHandler.END
+
+        try:
+            response = self.user_sessions[user_id].chat(update.message.text)
+            await update.message.reply_text(
+                response.choices[0].message.content,
+                reply_markup=self._model_keyboard()
+            )
+            logger.info("Обработан запрос от пользователя %s", user_id)
+            return CHATTING
+        except GigaChatException as e:
+            await update.message.reply_text(
+                f"Ошибка GigaChat: {str(e)}\nНажмите /start чтобы перезапустить бота.",
+                reply_markup=None
+            )
+            logger.error("Ошибка GigaChat: %s", e)
+            return ConversationHandler.END
+        except Exception as e:
+            await update.message.reply_text(
+                "Произошла внутренняя ошибка. Пожалуйста, попробуйте позже.",
+                reply_markup=None
+            )
+            logger.exception("Неожиданная ошибка при обработке сообщения")
+            return ConversationHandler.END
+
+    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Обработчик команды /cancel.
+        
+        Args:
+            update: Объект Update от Telegram
+            context: Контекст выполнения
+            
+        Returns:
+            int: Конечное состояние ConversationHandler
+        """
+        user_id = update.message.from_user.id
+        if user_id in self.user_sessions:
+            del self.user_sessions[user_id]
+            logger.info("Сессия пользователя %s завершена", user_id)
         await update.message.reply_text(
-            f"Ошибка при инициализации GigaChat: {str(e)}\nПопробуйте позже."
-        )
-        return ConversationHandler.END
-
-
-# Обработчик выбора модели (для недоступных моделей)
-async def handle_model_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    selected_model = update.message.text
-    if "(не доступен)" in selected_model:
-        await update.message.reply_text(
-            "Эта модель недоступна в демонстрационной версии. Продолжаем использовать GigaChat.",
-            reply_markup=model_keyboard()
-        )
-    return CHATTING
-
-
-# Обработчик текстовых сообщений
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-
-    if user_id not in user_sessions:
-        await update.message.reply_text(
-            "Сессия не инициализирована. Нажмите /start чтобы начать.",
+            "Сессия сброшена. Нажмите /start чтобы начать заново.",
             reply_markup=None
         )
         return ConversationHandler.END
 
-    try:
-        response = user_sessions[user_id].chat(update.message.text)
-        await update.message.reply_text(
-            response.choices[0].message.content,
-            reply_markup=model_keyboard()
-        )
-        return CHATTING
-    except Exception as e:
-        await update.message.reply_text(
-            f"Ошибка при обработке запроса: {str(e)}\nНажмите /start чтобы перезапустить бота.",
-            reply_markup=None
-        )
-        return ConversationHandler.END
+    def run(self) -> None:
+        """Запускает бота."""
+        try:
+            application = Application.builder().token(self.config["TELEGRAM_BOT_TOKEN"]).build()
 
+            conv_handler = ConversationHandler(
+                entry_points=[CommandHandler('start', self.start)],
+                states={
+                    CHATTING: [
+                        MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message),
+                        MessageHandler(filters.Regex(r"\(не доступен\)$"), self.handle_model_selection)
+                    ],
+                },
+                fallbacks=[CommandHandler('cancel', self.cancel)],
+            )
 
-# Обработчик команды /cancel
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    if user_id in user_sessions:
-        del user_sessions[user_id]
-    await update.message.reply_text(
-        "Сессия сброшена. Нажми /start чтобы начать заново.",
-        reply_markup=None
-    )
-    return ConversationHandler.END
-
-
-def main():
-    application = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            CHATTING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message),
-                MessageHandler(filters.Regex(r"\(не доступен\)$"), handle_model_selection)
-            ],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
-
-    application.add_handler(conv_handler)
-
-    print("Бот запущен...")
-    application.run_polling()
-
+            application.add_handler(conv_handler)
+            application.run_polling()
+            logger.info("Бот успешно запущен")
+        except Exception as e:
+            logger.critical("Критическая ошибка при запуске бота: %s", e)
+            raise
 
 if __name__ == '__main__':
-    main()
+    # Тесты (можно вынести в отдельный файл)
+    import unittest
+    from unittest.mock import MagicMock, patch
+
+    class TestGigaChatBot(unittest.TestCase):
+        """Тесты для GigaChatBot."""
+        
+        @patch('builtins.open')
+        def test_load_config(self, mock_open):
+            """Тест загрузки конфигурации."""
+            mock_open.return_value.__enter__.return_value = [
+                "TELEGRAM_BOT_TOKEN=test_token\n",
+                "GIGACHAT_AUTH_KEY=test_key\n"
+            ]
+            bot = GigaChatBot()
+            self.assertEqual(bot.config["TELEGRAM_BOT_TOKEN"], "test_token")
+            self.assertEqual(bot.config["GIGACHAT_AUTH_KEY"], "test_key")
+
+        @patch('gigachat.GigaChat')
+        def test_init_gigachat(self, mock_giga):
+            """Тест инициализации GigaChat."""
+            bot = GigaChatBot()
+            bot.config = {"GIGACHAT_AUTH_KEY": "test_key"}
+            bot._init_gigachat(123)
+            self.assertIn(123, bot.user_sessions)
+
+    # Запуск бота
+    try:
+        bot = GigaChatBot()
+        bot.run()
+    except Exception as e:
+        logger.critical("Не удалось запустить бота: %s", e)
